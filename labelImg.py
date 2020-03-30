@@ -46,8 +46,10 @@ from libs.yolo_io import TXT_EXT
 from libs.ustr import ustr
 from libs.hashableQListWidgetItem import HashableQListWidgetItem
 
+from utils import utility
 __appname__ = 'labelImg'
 
+import pdb
 class WindowMixin(object):
 
     def menu(self, title, actions=None):
@@ -114,6 +116,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
         listLayout = QVBoxLayout()
         listLayout.setContentsMargins(0, 0, 0, 0)
+
+        # Add label to show text: laeblFB / labelMissing
+        self.taskLabel = QLabel("标注上下两层")
+        self.taskLabel.setStyleSheet('color: red')
+        self.taskLabel.setFixedSize(100, 50)
+        listLayout.addWidget(self.taskLabel)
 
         # Create a widget for using default label
         self.useDefaultLabelCheckbox = QCheckBox(getStr('useDefaultLabel'))
@@ -198,6 +206,11 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.dockFeatures = QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetFloatable
         self.dock.setFeatures(self.dock.features() ^ self.dockFeatures)
+
+        # Add flag for label first run (top/bottom) or second run (missing)
+        self.labelMissing = False
+
+
 
         # Actions
         action = partial(newAction, self)
@@ -744,6 +757,58 @@ class MainWindow(QMainWindow, WindowMixin):
             action.setEnabled(True)
         self.updateComboBox()
 
+    # This is SPECIFICALLY design for AOI shift case.
+    # We let operator draw bounding box and without choosing
+    # the name of class by hand.
+    def autoVerifyLabel(self, shape):   
+        # If there is no labelFile can be loaded, 
+        # label top_layer and bottom_layer
+        if self.labelMissing is not True:
+            if self.labelList is None or len(self.labelList) == 0:
+                pass
+            else:
+                #itemsTextList = [str(self.labelList.item(i).text()) for i in range(self.labelList.count())]
+                #print(itemsTextList)
+                for i in range(self.labelList.count()):
+                    item = self.labelList.item(i)
+                    cur_text = item.text()
+                    cur_shape = self.itemsToShapes[item]
+                    flag, shape_area, cur_area = utility.hasIntersect(shape, cur_shape)
+                    if flag:
+                        if cur_text != "Unknown":
+                            self.deleteIncorrectBox()
+                        else:
+                            if shape_area < cur_area:
+                                item.setText("下层")
+                                shape.label = "上层元器件"
+                            else:
+                                item.setText("上层元器件")
+                                shape.label = "下层"
+        else:
+            if self.labelList is None or len(self.labelList) == 0:
+                pass
+            else:
+                for i in range(self.labelList.count()):
+                    item = self.labelList.item(i)
+                    cur_text = item.text()
+                    cur_shape = self.itemsToShapes[item]
+                    flag, shape_area, cur_area = utility.hasIntersect(shape, cur_shape)
+                    if flag:
+                        self.deleteIncorrectBox()
+            shape.label = "缺失"
+            
+    def isLabelsLegal(self):
+        """ If labelFB and there is Unknown remained,
+            Then return False
+        """ 
+        if self.labelMissing is not True:
+            for i in range(self.labelList.count()):
+                item = self.labelList.item(i);
+                cur_text = item.text();
+                if cur_text == "Unknown":
+                    return False
+        return True
+
     def remLabel(self, shape):
         if shape is None:
             # print('rm empty label')
@@ -871,26 +936,29 @@ class MainWindow(QMainWindow, WindowMixin):
 
         position MUST be in global coordinates.
         """
-        if not self.useDefaultLabelCheckbox.isChecked() or not self.defaultLabelTextLine.text():
-            if len(self.labelHist) > 0:
-                self.labelDialog = LabelDialog(
-                    parent=self, listItem=self.labelHist)
-
-            # Sync single class mode from PR#106
-            if self.singleClassMode.isChecked() and self.lastLabel:
-                text = self.lastLabel
-            else:
-                text = self.labelDialog.popUp(text=self.prevLabelText)
-                self.lastLabel = text
-        else:
-            text = self.defaultLabelTextLine.text()
-
+        #if not self.useDefaultLabelCheckbox.isChecked() or not self.defaultLabelTextLine.text():
+        #    if len(self.labelHist) > 0:
+        #        self.labelDialog = LabelDialog(
+        #            parent=self, listItem=self.labelHist)
+        #    # Sync single class mode from PR#106
+        #    if self.singleClassMode.isChecked() and self.lastLabel:
+        #        text = self.lastLabel
+        #        print("text1 is: {}".format(text))
+        #    else:
+        #        text = self.labelDialog.popUp(text=self.prevLabelText)
+        #        self.lastLabel = text
+        #        print("text2 is {}".format(text))
+        #else:
+        #    text = self.defaultLabelTextLine.text()
+        # Todo Lei add unknow to disallow label class name
+        text = "Unknown"
         # Add Chris
         self.diffcButton.setChecked(False)
         if text is not None:
             self.prevLabelText = text
             generate_color = generateColorByText(text)
             shape = self.canvas.setLastLabel(text, generate_color, generate_color)
+            self.autoVerifyLabel(shape)
             self.addLabel(shape)
             if self.beginner():  # Switch to edit mode.
                 self.canvas.setEditing(True)
@@ -1064,9 +1132,16 @@ class MainWindow(QMainWindow, WindowMixin):
                 PascalXML > YOLO
                 """
                 if os.path.isfile(xmlPath):
+                    self.labelMissing = True
+                    self.taskLabel.setText("标注缺失")
+
                     self.loadPascalXMLByFilename(xmlPath)
                 elif os.path.isfile(txtPath):
+                    self.labelMissing = True
                     self.loadYOLOTXTByFilename(txtPath)
+                else:
+                    self.labelMissing = False
+                    self.taskLabel.setText("标注上下两层")
             else:
                 xmlPath = os.path.splitext(filePath)[0] + XML_EXT
                 txtPath = os.path.splitext(filePath)[0] + TXT_EXT
@@ -1317,6 +1392,11 @@ class MainWindow(QMainWindow, WindowMixin):
             self.loadFile(filename)
 
     def saveFile(self, _value=False):
+        # Add function to determine whether currnet is legal or not:
+        if self.isLabelsLegal() is not True: 
+            self.canNotSave()    
+            return
+
         if self.defaultSaveDir is not None and len(ustr(self.defaultSaveDir)):
             if self.filePath:
                 imgFileName = os.path.basename(self.filePath)
@@ -1381,6 +1461,14 @@ class MainWindow(QMainWindow, WindowMixin):
         yes, no = QMessageBox.Yes, QMessageBox.No
         msg = u'You have unsaved changes, proceed anyway?'
         return yes == QMessageBox.warning(self, u'Attention', msg, yes | no)
+
+    def deleteIncorrectBox(self):
+        msg = u'有三个矩形框互相重叠，不合理，请检查!'
+        return QMessageBox.warning(self, u'No Way to Label 3 Objects Together', msg, QMessageBox.Ok)
+
+    def canNotSave(self):
+        msg = u'某个元器件需要标注上下两个，有漏标!'
+        return QMessageBox.warning(self, u'取消保存', msg, QMessageBox.Ok)
 
     def errorMessage(self, title, message):
         return QMessageBox.critical(self, title,
