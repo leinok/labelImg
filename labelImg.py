@@ -120,7 +120,8 @@ class MainWindow(QMainWindow, WindowMixin):
         # Add label to show text: laeblFB / labelMissing
         self.taskLabel = QLabel("标注上下两层")
         self.taskLabel.setStyleSheet('color: red')
-        self.taskLabel.setFixedSize(100, 50)
+        self.taskLabel.setFixedSize(200, 100)
+        self.taskLabel.setFont(QFont("Helvetica", 20, QFont.Bold))
         listLayout.addWidget(self.taskLabel)
 
         # Create a widget for using default label
