@@ -11,6 +11,7 @@ except ImportError:
 
 from libs.utils import distance
 import sys
+import math 
 
 DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)
 DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
@@ -45,6 +46,11 @@ class Shape(object):
         self.selected = False
         self.difficult = difficult
         self.paintLabel = paintLabel
+        
+        self.direction = 0
+        self.center = None
+        self.isRotated = True
+
 
         self._highlightIndex = None
         self._highlightMode = self.NEAR_VERTEX
@@ -61,7 +67,23 @@ class Shape(object):
             # is used for drawing the pending line a different color.
             self.line_color = line_color
 
+    def rotate(self, theta):
+        for i, p in enumerate(self.points):
+            self.points[i] = self.rotatePoint(p, theta)
+        self.direction -= theta
+        self.direction = self.direction % (2 * math.pi)
+
+    def rotatePoint(self, p, theta):
+        order = p-self.center;
+        cosTheta = math.cos(theta)
+        sinTheta = math.sin(theta)
+        pResx = cosTheta * order.x() + sinTheta * order.y()
+        pResy = - sinTheta * order.x() + cosTheta * order.y()
+        pRes = QPointF(self.center.x() + pResx, self.center.y() + pResy)
+        return pRes
+
     def close(self):
+        self.center = QPointF((self.points[0].x()+self.points[2].x()) / 2, (self.points[0].y()+self.points[2].y()) / 2)
         self._closed = True
 
     def reachMaxPoints(self):
@@ -132,6 +154,25 @@ class Shape(object):
             if self.fill:
                 color = self.select_fill_color if self.selected else self.fill_color
                 painter.fillPath(line_path, color)
+            
+            if self.center is not None:
+                center_path = QPainterPath()
+                d = self.point_size / self.scale
+                center_path.addRect(self.center.x() - d / 2, self.center.y() - d / 2, d, d)
+                painter.drawPath(center_path)
+                if self.isRotated:
+                    painter.fillPath(center_path, self.vertex_fill_color)
+                else:
+                    painter.fillPath(center_path, QColor(0, 0, 0))
+
+    def paintNormalCenter(self, painter):
+        if self.center is not None:
+            center_path = QPainterPath();
+            d = self.point_size / self.scale
+            center_path.addRect(self.center.x() - d / 2, self.center.y() - d / 2, d, d)
+            painter.drawPath(center_path)
+            if not self.isRotated:
+                painter.fillPath(center_path, QColor(0, 0, 0))
 
     def drawVertex(self, path, i):
         d = self.point_size / self.scale
@@ -185,6 +226,12 @@ class Shape(object):
     def copy(self):
         shape = Shape("%s" % self.label)
         shape.points = [p for p in self.points]
+        
+        shape.center = self.center
+        shape.direction = self.direction
+        shape.isRotated = self.isRotated
+
+
         shape.fill = self.fill
         shape.selected = self.selected
         shape._closed = self._closed

@@ -262,6 +262,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         create = action(getStr('crtBox'), self.createShape,
                         'w', 'new', getStr('crtBoxDetail'), enabled=False)
+
         delete = action(getStr('delBox'), self.deleteSelectedShape,
                         'Delete', 'delete', getStr('delBoxDetail'), enabled=False)
         copy = action(getStr('dupBox'), self.copySelectedShape,
@@ -633,9 +634,11 @@ class MainWindow(QMainWindow, WindowMixin):
         msg = u'Name:{0} \nApp Version:{1} \n{2} '.format(__appname__, __version__, sys.version_info)
         QMessageBox.information(self, u'Information', msg)
 
+    ## Enable rotated shape
     def createShape(self):
         assert self.beginner()
         self.canvas.setEditing(False)
+        self.canvas.canDrawRotatedRect = True
         self.actions.create.setEnabled(False)
 
     def toggleDrawingSensitive(self, drawing=True):
@@ -822,7 +825,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadLabels(self, shapes):
         s = []
-        for label, points, line_color, fill_color, difficult in shapes:
+        for label, points, direction, isRotated, line_color, fill_color, difficult in shapes:
             shape = Shape(label=label)
             for x, y in points:
 
@@ -833,6 +836,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
                 shape.addPoint(QPointF(x, y))
             shape.difficult = difficult
+            shape.direction = direction
+            shape.isRotated = isRotated
             shape.close()
             s.append(shape)
 
@@ -873,7 +878,10 @@ class MainWindow(QMainWindow, WindowMixin):
                         fill_color=s.fill_color.getRgb(),
                         points=[(p.x(), p.y()) for p in s.points],
                        # add chris
-                        difficult = s.difficult)
+                        difficult = s.difficult,
+                        direction = s.direction,
+                        center = s.center,
+                        isRotated = s.isRotated)
 
         shapes = [format_shape(shape) for shape in self.canvas.shapes]
         # Can add differrent annotation formats here
