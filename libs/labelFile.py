@@ -13,6 +13,7 @@ from libs.pascal_voc_io import XML_EXT
 import os.path
 import sys
 
+import math
 
 class LabelFileError(Exception):
     pass
@@ -50,8 +51,10 @@ class LabelFile(object):
             label = shape['label']
             # Add Chris
             difficult = int(shape['difficult'])
-            bndbox = LabelFile.convertPoints2BndBox(points)
-            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label, difficult)
+            direction = shape['direction']
+            #bndbox = LabelFile.convertPoints2BndBox(points)
+            bndbox = LabelFile.convertPoints2RotatedBndBox(shape)
+            writer.addRotatedBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], bndbox[4], label, difficult)
 
         writer.save(targetFile=filename)
         return
@@ -144,3 +147,24 @@ class LabelFile(object):
             ymin = 1
 
         return (int(xmin), int(ymin), int(xmax), int(ymax))
+
+
+    # You Hao, 2017/06/121
+    @staticmethod
+    def convertPoints2RotatedBndBox(shape):
+        points = shape['points']
+        center = shape['center']
+        direction = shape['direction']
+
+        cx = center.x()
+        cy = center.y()
+        
+        w = math.sqrt((points[0][0]-points[1][0]) ** 2 +
+            (points[0][1]-points[1][1]) ** 2)
+
+        h = math.sqrt((points[2][0]-points[1][0]) ** 2 +
+            (points[2][1]-points[1][1]) ** 2)
+
+        angle = direction % math.pi
+
+        return (round(cx,4),round(cy,4),round(w,4),round(h,4),round(angle,6))

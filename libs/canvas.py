@@ -30,6 +30,7 @@ class Canvas(QWidget):
     shapeMoved = pyqtSignal()
     drawingPolygon = pyqtSignal(bool)
 
+    status = pyqtSignal(str)
     CREATE, EDIT = list(range(2))
 
     epsilon = 11.0
