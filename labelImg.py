@@ -783,11 +783,11 @@ class MainWindow(QMainWindow, WindowMixin):
                             self.deleteIncorrectBox()
                         else:
                             if shape_area < cur_area:
-                                item.setText("下层")
-                                shape.label = "上层元器件"
+                                item.setText("bottom_layer")
+                                shape.label = "top_layer"
                             else:
-                                item.setText("上层元器件")
-                                shape.label = "下层"
+                                item.setText("top_layer")
+                                shape.label = "bottom_layer"
         else:
             if self.labelList is None or len(self.labelList) == 0:
                 pass
@@ -799,7 +799,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     flag, shape_area, cur_area = utility.hasIntersect(shape, cur_shape)
                     if flag:
                         self.deleteIncorrectBox()
-            shape.label = "缺失"
+            shape.label = "missing"
             
     def isLabelsLegal(self):
         """ If labelFB and there is Unknown remained,
